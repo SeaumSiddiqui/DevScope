@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DevScope</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+            href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+            rel="stylesheet"
+    />
+    <style>
+        *,
+        *::before,
+        *::after {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        :root {
+          --bg: #0a0a0a;
+          --surface: #111111;
+          --surface2: #1a1a1a;
+          --border: #242424;
+          --border2: #2e2e2e;
+          --text: #e2e2e2;
+          --muted: #555;
+          --muted2: #777;
+          --amber: #f59e0b;
+          --amber-dim: rgba(245, 158, 11, 0.12);
+          --red: #ef4444;
+          --red-dim: rgba(239, 68, 68, 0.1);
+          --blue: #60a5fa;
+          --blue-dim: rgba(96, 165, 250, 0.1);
+          --green: #4ade80;
+          --green-dim: rgba(74, 222, 128, 0.1);
+          --gray-dim: rgba(255, 255, 255, 0.04);
+          --mono: "IBM Plex Mono", monospace;
+          --sans: "IBM Plex Sans", sans-serif;
+          --radius: 6px;
+          --header-h: 52px;
+        }
+
+        html,
+        body {
+          height: 100%;
+          background: var(--bg);
+          color: var(--text);
+          font-family: var(--sans);
+          font-size: 13px;
+          line-height: 1.5;
+          overflow: hidden;
+        }
+
+        /* ── Header ─────────────────────────────────────────────────── */
+        #header {
+          height: var(--header-h);
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: center;
+          padding: 0 20px;
+          gap: 20px;
+          background: var(--surface);
+          position: relative;
+          z-index: 100;
+        }
+
+        #logo {
+          font-family: var(--mono);
+          font-weight: 600;
+          font-size: 15px;
+          letter-spacing: -0.5px;
+          color: var(--text);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        #logo .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--amber);
+          box-shadow: 0 0 8px var(--amber);
+          animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.4;
+          }
+        }
+
+        #stats {
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--muted2);
+          display: flex;
+          gap: 16px;
+        }
+
+        #stats .stat-errors {
+          color: var(--red);
+        }
+        #stats .stat-logs {
+          color: var(--blue);
+        }
+
+        #header-actions {
+          margin-left: auto;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .btn {
+          font-family: var(--mono);
+          font-size: 11px;
+          padding: 5px 12px;
+          border-radius: var(--radius);
+          border: 1px solid var(--border2);
+          background: transparent;
+          color: var(--muted2);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .btn:hover {
+          border-color: var(--muted);
+          color: var(--text);
+        }
+        .btn.danger:hover {
+          border-color: var(--red);
+          color: var(--red);
+        }
+
+        #refresh-indicator {
+          font-family: var(--mono);
+          font-size: 10px;
+          color: var(--muted);
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        #refresh-indicator .tick {
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: var(--muted);
+          transition: background 0.2s;
+        }
+
+        #refresh-indicator .tick.active {
+          background: var(--green);
+          box-shadow: 0 0 6px var(--green);
+        }
+
+        /* ── Layout ─────────────────────────────────────────────────── */
+        #layout {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          height: calc(100vh - var(--header-h));
+          overflow: hidden;
+        }
+
+        .panel {
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          border-right: 1px solid var(--border);
+        }
+
+        .panel:last-child {
+          border-right: none;
+        }
+
+        .panel-header {
+          padding: 10px 16px;
+          border-bottom: 1px solid var(--border);
+          font-family: var(--mono);
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted2);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: var(--surface);
+          flex-shrink: 0;
+        }
+
+        .panel-header .badge {
+          background: var(--surface2);
+          border: 1px solid var(--border2);
+          border-radius: 10px;
+          padding: 1px 7px;
+          font-size: 10px;
+          color: var(--muted2);
+        }
+
+        .panel-filter {
+          padding: 8px 16px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          gap: 6px;
+          flex-shrink: 0;
+        }
+
+        .filter-btn {
+          font-family: var(--mono);
+          font-size: 10px;
+          padding: 3px 9px;
+          border-radius: 10px;
+          border: 1px solid var(--border2);
+          background: transparent;
+          color: var(--muted2);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .filter-btn:hover {
+          color: var(--text);
+          border-color: var(--muted);
+        }
+        .filter-btn.active {
+          background: var(--surface2);
+          color: var(--text);
+          border-color: var(--border2);
+        }
+        .filter-btn.active.all {
+          border-color: var(--muted);
+        }
+        .filter-btn.active.err {
+          border-color: var(--red);
+          color: var(--red);
+        }
+        .filter-btn.active.warn {
+          border-color: var(--amber);
+          color: var(--amber);
+        }
+        .filter-btn.active.info {
+          border-color: var(--blue);
+          color: var(--blue);
+        }
+
+        .panel-body {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+
+        .panel-body::-webkit-scrollbar {
+          width: 4px;
+        }
+        .panel-body::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .panel-body::-webkit-scrollbar-thumb {
+          background: var(--border2);
+          border-radius: 2px;
+        }
+
+        /* ── Empty state ─────────────────────────────────────────────── */
+        .empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          gap: 8px;
+          color: var(--muted);
+          font-family: var(--mono);
+          font-size: 12px;
+        }
+
+        .empty .empty-icon {
+          font-size: 28px;
+          opacity: 0.3;
+        }
+
+        /* ── Error list ──────────────────────────────────────────────── */
+        .error-item {
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
+          cursor: pointer;
+          transition: background 0.12s;
+          position: relative;
+        }
+
+        .error-item::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: var(--red);
+          opacity: 0;
+          transition: opacity 0.12s;
+        }
+
+        .error-item:hover {
+          background: var(--red-dim);
+        }
+        .error-item:hover::before {
+          opacity: 1;
+        }
+        .error-item.selected {
+          background: var(--red-dim);
+        }
+        .error-item.selected::before {
+          opacity: 1;
+        }
+
+        .error-item .exc-class {
+          font-family: var(--mono);
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--red);
+          margin-bottom: 3px;
+        }
+
+        .error-item .exc-message {
+          font-family: var(--mono);
+          font-size: 11px;
+          color: var(--text);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-bottom: 5px;
+        }
+
+        .error-item .error-meta {
+          display: flex;
+          gap: 12px;
+          font-family: var(--mono);
+          font-size: 10px;
+          color: var(--muted2);
+        }
+
+        .error-item .app-frame-hint {
+          color: var(--amber);
+          font-weight: 500;
+        }
+
+        /* ── Log list ────────────────────────────────────────────────── */
+        .log-item {
+          display: grid;
+          grid-template-columns: 44px 1fr;
+          gap: 8px;
+          padding: 5px 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+          font-family: var(--mono);
+          font-size: 11px;
+          line-height: 1.6;
+          transition: background 0.1s;
+        }
+
+        .log-item:hover {
+          background: var(--gray-dim);
+        }
+
+        .log-item.trigger-log {
+          background: var(--amber-dim);
+          border-left: 2px solid var(--amber);
+          padding-left: 14px;
+        }
+
+        .log-level {
+          font-weight: 600;
+          font-size: 10px;
+          align-self: start;
+          padding-top: 2px;
+          text-align: right;
+        }
+
+        .log-level.ERROR {
+          color: var(--red);
+        }
+        .log-level.WARN {
+          color: var(--amber);
+        }
+        .log-level.INFO {
+          color: var(--blue);
+        }
+        .log-level.DEBUG {
+          color: var(--muted2);
+        }
+        .log-level.TRACE {
+          color: var(--muted);
+        }
+
+        .log-body {
+          overflow: hidden;
+        }
+
+        .log-logger {
+          color: var(--muted);
+          font-size: 10px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .log-message {
+          color: var(--text);
+          word-break: break-word;
+        }
+
+        /* ── Detail drawer ───────────────────────────────────────────── */
+        #detail-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 200;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s;
+        }
+
+        #detail-overlay.open {
+          opacity: 1;
+          pointer-events: all;
+        }
+
+        #detail-drawer {
+          position: fixed;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          width: min(780px, 80vw);
+          background: var(--surface);
+          border-left: 1px solid var(--border2);
+          z-index: 201;
+          display: flex;
+          flex-direction: column;
+          transform: translateX(100%);
+          transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+          overflow: hidden;
+        }
+
+        #detail-drawer.open {
+          transform: translateX(0);
+        }
+
+        #detail-header {
+          padding: 16px 20px;
+          border-bottom: 1px solid var(--border);
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          flex-shrink: 0;
+        }
+
+        #detail-header .exc-badge {
+          font-family: var(--mono);
+          font-size: 11px;
+          background: var(--red-dim);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          color: var(--red);
+          border-radius: var(--radius);
+          padding: 3px 8px;
+          white-space: nowrap;
+        }
+
+        #detail-header .exc-info {
+          flex: 1;
+          min-width: 0;
+        }
+
+        #detail-header .exc-full-class {
+          font-family: var(--mono);
+          font-size: 13px;
+          font-weight: 600;
+          color: var(--red);
+          margin-bottom: 4px;
+        }
+
+        #detail-header .exc-msg {
+          font-family: var(--mono);
+          font-size: 12px;
+          color: var(--text);
+          word-break: break-word;
+        }
+
+        #detail-header .exc-meta {
+          font-family: var(--mono);
+          font-size: 10px;
+          color: var(--muted2);
+          margin-top: 6px;
+          display: flex;
+          gap: 14px;
+        }
+
+        #detail-close {
+          background: none;
+          border: none;
+          color: var(--muted2);
+          font-size: 20px;
+          cursor: pointer;
+          padding: 0 4px;
+          line-height: 1;
+          flex-shrink: 0;
+        }
+        #detail-close:hover {
+          color: var(--text);
+        }
+
+        #detail-body {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 0;
+        }
+
+        #detail-body::-webkit-scrollbar {
+          width: 4px;
+        }
+        #detail-body::-webkit-scrollbar-thumb {
+          background: var(--border2);
+          border-radius: 2px;
+        }
+
+        /* ── Sections ────────────────────────────────────────────────── */
+        .section {
+          border-bottom: 1px solid var(--border);
+        }
+
+        .section-header {
+          padding: 10px 20px;
+          font-family: var(--mono);
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--muted2);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
+          background: var(--surface);
+          position: sticky;
+          top: 0;
+          z-index: 10;
+        }
+
+        .section-header:hover {
+          color: var(--text);
+        }
+
+        .section-header .chevron {
+          margin-left: auto;
+          transition: transform 0.15s;
+          font-size: 10px;
+        }
+
+        .section-header.collapsed .chevron {
+          transform: rotate(-90deg);
+        }
+
+        .section-content {
+          padding: 8px 0;
+        }
+        .section-content.hidden {
+          display: none;
+        }
+
+        /* ── Stack frames ────────────────────────────────────────────── */
+        .frames-toggle {
+          padding: 6px 20px;
+          font-family: var(--mono);
+          font-size: 10px;
+          color: var(--muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .frames-toggle:hover {
+          color: var(--muted2);
+        }
+
+        .frame-row {
+          padding: 3px 20px;
+          display: grid;
+          grid-template-columns: 16px 1fr auto;
+          gap: 8px;
+          align-items: baseline;
+          font-family: var(--mono);
+          font-size: 11px;
+          transition: background 0.1s;
+        }
+
+        .frame-row.app {
+          background: var(--amber-dim);
+        }
+        .frame-row.app:hover {
+          background: rgba(245, 158, 11, 0.18);
+        }
+        .frame-row.fw {
+          color: var(--muted);
+        }
+        .frame-row.fw:hover {
+          background: var(--gray-dim);
+        }
+
+        .frame-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          justify-self: center;
+          margin-top: 3px;
+          flex-shrink: 0;
+        }
+
+        .frame-row.app .frame-dot {
+          background: var(--amber);
+          box-shadow: 0 0 5px var(--amber);
+        }
+        .frame-row.fw .frame-dot {
+          background: var(--border2);
+        }
+
+        .frame-class {
+          color: inherit;
+          word-break: break-all;
+        }
+        .frame-row.app .frame-class {
+          color: var(--amber);
+        }
+
+        .frame-method {
+          color: var(--muted2);
+        }
+        .frame-row.app .frame-method {
+          color: var(--text);
+          font-weight: 500;
+        }
+
+        .frame-line {
+          font-size: 10px;
+          color: var(--muted);
+          white-space: nowrap;
+          text-align: right;
+        }
+
+        .frame-row.app .frame-line {
+          color: var(--amber);
+        }
+
+        /* ── Cause chain ─────────────────────────────────────────────── */
+        .cause-item {
+          margin: 4px 20px;
+          border: 1px solid var(--border2);
+          border-radius: var(--radius);
+          overflow: hidden;
+        }
+
+        .cause-header {
+          padding: 8px 12px;
+          background: var(--surface2);
+          font-family: var(--mono);
+          font-size: 11px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .cause-header:hover {
+          background: var(--gray-dim);
+        }
+
+        .cause-label {
+          font-size: 10px;
+          color: var(--muted2);
+          margin-right: 4px;
+        }
+
+        .cause-class {
+          color: var(--red);
+          font-weight: 500;
+        }
+        .cause-msg {
+          color: var(--muted2);
+          font-size: 10px;
+        }
+        .cause-chevron {
+          margin-left: auto;
+          font-size: 10px;
+          color: var(--muted);
+          transition: transform 0.15s;
+        }
+        .cause-header.open .cause-chevron {
+          transform: rotate(90deg);
+        }
+
+        .cause-frames {
+          display: none;
+          border-top: 1px solid var(--border);
+        }
+        .cause-frames.open {
+          display: block;
+        }
+
+        /* ── Correlated logs ─────────────────────────────────────────── */
+        .corr-log {
+          display: grid;
+          grid-template-columns: 44px 1fr;
+          gap: 8px;
+          padding: 5px 20px;
+          font-family: var(--mono);
+          font-size: 11px;
+          line-height: 1.6;
+        }
+
+        .corr-log.trigger {
+          background: var(--amber-dim);
+          border-left: 2px solid var(--amber);
+          padding-left: 18px;
+        }
+
+        /* ── Utilities ───────────────────────────────────────────────── */
+        .tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-family: var(--mono);
+          font-size: 10px;
+          padding: 1px 6px;
+          border-radius: 3px;
+          border: 1px solid;
+        }
+
+        .tag.amber {
+          color: var(--amber);
+          border-color: rgba(245, 158, 11, 0.35);
+          background: var(--amber-dim);
+        }
+        .tag.red {
+          color: var(--red);
+          border-color: rgba(239, 68, 68, 0.35);
+          background: var(--red-dim);
+        }
+        .tag.blue {
+          color: var(--blue);
+          border-color: rgba(96, 165, 250, 0.35);
+          background: var(--blue-dim);
+        }
+
+        .no-data {
+          padding: 30px 20px;
+          text-align: center;
+          color: var(--muted);
+          font-family: var(--mono);
+          font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+<!-- ── Header ── -->
+<div id="header">
+    <div id="logo">
+        <span class="dot"></span>
+        DevScope
+    </div>
+    <div id="stats">
+        <span class="stat-errors" id="stat-errors">0 errors</span>
+        <span style="color:var(--border2)">·</span>
+        <span class="stat-logs" id="stat-logs">0 logs</span>
+        <span style="color:var(--border2)">·</span>
+        <span style="color:var(--amber);font-family:var(--mono);font-size:11px;">⬡ <span id="stat-profile">default</span></span>
+    </div>
+    <div id="header-actions">
+        <div id="refresh-indicator">
+            <span class="tick" id="tick"></span>
+            live
+        </div>
+        <button class="btn danger" onclick="clearAll()">clear all</button>
+    </div>
+</div>
+
+<!-- ── Main layout ── -->
+<div id="layout">
+    <!-- Errors panel -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Errors</span>
+            <span class="badge" id="error-count-badge">0</span>
+        </div>
+        <div class="panel-body" id="error-list">
+            <div class="empty">
+                <div class="empty-icon">✓</div>
+                <div>No errors captured yet</div>
+                <div style="color: var(--muted); font-size: 10px; margin-top: 4px">
+                    Exceptions logged by your app appear here
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs panel -->
+    <div class="panel">
+        <div class="panel-header">
+            <span>Logs</span>
+            <span class="badge" id="log-count-badge">0</span>
+        </div>
+        <div class="panel-filter">
+            <button
+                    class="filter-btn active all"
+                    data-level="ALL"
+                    onclick="setLogFilter('ALL', this)"
+            >
+                all
+            </button>
+            <button
+                    class="filter-btn err"
+                    data-level="ERROR"
+                    onclick="setLogFilter('ERROR', this)"
+            >
+                error
+            </button>
+            <button
+                    class="filter-btn warn"
+                    data-level="WARN"
+                    onclick="setLogFilter('WARN', this)"
+            >
+                warn
+            </button>
+            <button
+                    class="filter-btn info"
+                    data-level="INFO"
+                    onclick="setLogFilter('INFO', this)"
+            >
+                info
+            </button>
+            <button
+                    class="filter-btn"
+                    data-level="DEBUG"
+                    onclick="setLogFilter('DEBUG', this)"
+            >
+                debug
+            </button>
+        </div>
+        <div class="panel-body" id="log-list">
+            <div class="empty">
+                <div class="empty-icon">◌</div>
+                <div>Waiting for log events</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Detail drawer ── -->
+<div id="detail-overlay" onclick="closeDetail()"></div>
+<div id="detail-drawer">
+    <div id="detail-header">
+        <div class="exc-info">
+            <div class="exc-full-class" id="d-exc-class"></div>
+            <div class="exc-msg" id="d-exc-msg"></div>
+            <div class="exc-meta" id="d-exc-meta"></div>
+        </div>
+        <button id="detail-close" onclick="closeDetail()">×</button>
+    </div>
+    <div id="detail-body"></div>
+</div>
+
+<script>
+    // ── State ────────────────────────────────────────────────────────────────
+    let errors = [];
+    let selectedId = null;
+    let logFilter = "ALL";
+    let showFwFrames = {}; // per-error-id toggle state for framework frames
+
+    // ── Polling ──────────────────────────────────────────────────────────────
+    async function poll() {
+      try {
+        const tick = document.getElementById("tick");
+        tick.classList.add("active");
+        setTimeout(() => tick.classList.remove("active"), 400);
+
+        // Save drawer scroll position before any DOM updates.
+        // Browser can reset scroll on sibling DOM mutations during poll.
+        const detailBody  = document.getElementById("detail-body");
+        const savedScroll = detailBody ? detailBody.scrollTop : 0;
+
+        const [statsRes, errorsRes, logsRes] = await Promise.all([
+          fetch("/dev-scope/api/stats"),
+          fetch("/dev-scope/api/errors"),
+          fetch("/dev-scope/api/logs" + (logFilter !== "ALL" ? "?level=" + logFilter : "")),
+        ]);
+
+        const stats = await statsRes.json();
+        errors      = await errorsRes.json();
+        const logs  = await logsRes.json();
+
+        renderStats(stats);
+        renderErrors(errors);
+        renderLogs(logs);
+
+        // Only update the timestamp — never rebuild the detail DOM during polling.
+        // The error data doesn't change after capture, so rebuilding destroys all
+        // expanded/collapsed state for nothing.
+        if (selectedId) {
+          const current = errors.find((e) => e.id === selectedId);
+          if (current) updateDetailTimestamp(current);
+        }
+
+        // Restore scroll after all DOM updates settle.
+        if (detailBody && savedScroll > 0) {
+          detailBody.scrollTop = savedScroll;
+        }
+
+      } catch (e) {
+        console.error("DevScope poll failed", e);
+      }
+    }
+
+    function renderStats(stats) {
+        document.getElementById('stat-errors').textContent = stats.errorCount + ' errors';
+        document.getElementById('stat-logs').textContent   = stats.logCount   + ' logs';
+        document.getElementById('error-count-badge').textContent = stats.errorCount;
+        document.getElementById('log-count-badge').textContent   = stats.logCount;
+
+        const profiles = stats.activeProfiles || ['default'];
+        document.getElementById('stat-profile').textContent = profiles.join(', ');
+    }
+
+    // ── Error list ───────────────────────────────────────────────────────────
+    function renderErrors(list) {
+      const el = document.getElementById("error-list");
+      if (!list.length) {
+        el.innerHTML = `<div class="empty"><div class="empty-icon">✓</div><div>No errors captured yet</div><div style="color:var(--muted);font-size:10px;margin-top:4px;">Exceptions logged by your app appear here</div></div>`;
+        return;
+      }
+
+      el.innerHTML = list
+        .map((e) => {
+          const appFrame = e.frames ? e.frames.find((f) => f.appFrame) : null;
+          const shortClass = shortName(e.exceptionClass);
+          const selected = e.id === selectedId ? "selected" : "";
+          return `
+      <div class="error-item ${selected}" onclick="selectError('${e.id}')">
+        <div class="exc-class">${shortClass}</div>
+        <div class="exc-message">${esc(e.exceptionMessage || "(no message)")}</div>
+        <div class="error-meta">
+          <span>${relTime(e.timestamp)}</span>
+          <span>${e.threadName}</span>
+          ${appFrame ? `<span class="app-frame-hint">⟶ ${shortName(appFrame.className)}.${appFrame.methodName}:${appFrame.lineNumber}</span>` : ""}
+        </div>
+      </div>`;
+        })
+        .join("");
+    }
+
+    function selectError(id) {
+      selectedId = id;
+      const error = errors.find((e) => e.id === id);
+      if (!error) return;
+
+      // Re-render list so selected state updates
+      renderErrors(errors);
+      renderDetail(error);
+
+      document.getElementById("detail-overlay").classList.add("open");
+      document.getElementById("detail-drawer").classList.add("open");
+    }
+
+    function closeDetail() {
+      selectedId = null;
+      document.getElementById("detail-overlay").classList.remove("open");
+      document.getElementById("detail-drawer").classList.remove("open");
+      renderErrors(errors);
+    }
+
+    function updateDetailTimestamp(error) {
+      const meta = document.getElementById('d-exc-meta');
+      if (meta) {
+          meta.innerHTML = `<span>${relTime(error.timestamp)}</span><span>${esc(error.threadName)}</span>`;
+      }
+    }
+
+    // ── Detail view ──────────────────────────────────────────────────────────
+    function renderDetail(error) {
+      document.getElementById("d-exc-class").textContent =
+        error.exceptionClass || "";
+      document.getElementById("d-exc-msg").textContent =
+        error.exceptionMessage || "(no message)";
+      document.getElementById("d-exc-meta").innerHTML =
+        `<span>${relTime(error.timestamp)}</span><span>${esc(error.threadName)}</span>`;
+
+      const appFrames = (error.frames || []).filter((f) => f.appFrame);
+      const fwFrames = (error.frames || []).filter((f) => !f.appFrame);
+
+      const body = document.getElementById("detail-body");
+      body.innerHTML = "";
+
+      // Stack trace section — content gets a stable ID so toggleFwFrames
+      // can surgically update only the frames without rebuilding the drawer
+      const stackSection = makeSection(
+        "Stack trace",
+        `<span class="tag amber">${appFrames.length} app</span>` +
+          `<span class="tag" style="color:var(--muted2);border-color:var(--border2);margin-left:4px;">${fwFrames.length} framework</span>`,
+        renderFramesHtml(error.frames || [], error.id),
+        false,
+      );
+      stackSection.querySelector('.section-content').id = 'frames-content-' + error.id;
+      body.appendChild(stackSection);
+
+      // Cause chain section
+      if (error.causeChain && error.causeChain.length) {
+        body.appendChild(
+          makeSection(
+            "Cause chain",
+            `<span class="tag red">${error.causeChain.length} layer${error.causeChain.length > 1 ? "s" : ""}</span>`,
+            renderCauseChainHtml(error.causeChain),
+            false,
+          ),
+        );
+      }
+
+      // Correlated logs section
+      if (error.correlatedLogs && error.correlatedLogs.length) {
+        body.appendChild(
+          makeSection(
+            "Correlated logs",
+            `<span class="tag blue">${error.correlatedLogs.length} lines</span>`,
+            renderCorrLogsHtml(error.correlatedLogs, error.triggerLogId),
+            false,
+          ),
+        );
+      }
+    }
+
+    function makeSection(title, badges, contentHtml, collapsed) {
+      const section = document.createElement("div");
+      section.className = "section";
+
+      const hdr = document.createElement("div");
+      hdr.className = "section-header" + (collapsed ? " collapsed" : "");
+      hdr.innerHTML = `${title} ${badges} <span class="chevron">▾</span>`;
+
+      const content = document.createElement("div");
+      content.className = "section-content" + (collapsed ? " hidden" : "");
+      content.innerHTML = contentHtml;
+
+      hdr.addEventListener("click", () => {
+        hdr.classList.toggle("collapsed");
+        content.classList.toggle("hidden");
+      });
+
+      section.appendChild(hdr);
+      section.appendChild(content);
+      return section;
+    }
+
+    function renderFramesHtml(frames, errorId) {
+      if (!frames.length)
+        return '<div class="no-data">No frames captured</div>';
+
+      const showFw = showFwFrames[errorId] || false;
+      const appFrames = frames.filter((f) => f.appFrame);
+      const fwFrames = frames.filter((f) => !f.appFrame);
+
+      let html = "";
+
+      // Always show app frames first, highlighted
+      appFrames.forEach((f) => {
+        html += frameRowHtml(f, "app");
+      });
+
+      // Framework frames — toggle to show/hide
+      if (fwFrames.length) {
+        if (!showFw) {
+          html += `<div class="frames-toggle" onclick="toggleFwFrames('${errorId}')">
+        ▸ ${fwFrames.length} framework frames hidden — click to show
+      </div>`;
+        } else {
+          html += `<div class="frames-toggle" onclick="toggleFwFrames('${errorId}')">
+        ▾ hide ${fwFrames.length} framework frames
+      </div>`;
+          // Show framework frames in original trace order
+          frames
+            .filter((f) => !f.appFrame)
+            .forEach((f) => {
+              html += frameRowHtml(f, "fw");
+            });
+        }
+      }
+
+      return html;
+    }
+
+    function frameRowHtml(f, type) {
+      const pkg = f.className.includes(".")
+        ? f.className.substring(0, f.className.lastIndexOf(".") + 1)
+        : "";
+      const cls = f.className.includes(".")
+        ? f.className.substring(f.className.lastIndexOf(".") + 1)
+        : f.className;
+      return `<div class="frame-row ${type}">
+    <span class="frame-dot"></span>
+    <span class="frame-class"><span style="opacity:0.5">${esc(pkg)}</span>${esc(cls)}.<span class="frame-method">${esc(f.methodName)}</span></span>
+    <span class="frame-line">${f.fileName}:${f.lineNumber}</span>
+  </div>`;
+    }
+
+    function toggleFwFrames(errorId) {
+      showFwFrames[errorId] = !showFwFrames[errorId];
+      // Only rebuild the frames content — not the entire drawer.
+      // Calling renderDetail here would wipe all cause chain expanded states.
+      const framesContent = document.getElementById('frames-content-' + errorId);
+      if (framesContent) {
+        const error = errors.find((e) => e.id === errorId);
+        if (error) framesContent.innerHTML = renderFramesHtml(error.frames || [], errorId);
+      }
+    }
+
+    function renderCauseChainHtml(chain) {
+      return chain
+        .map((c, i) => {
+          const id = "cause-" + i;
+          const appFrames = (c.frames || []).filter((f) => f.appFrame).length;
+          return `
+      <div class="cause-item">
+        <div class="cause-header" onclick="toggleCause('${id}', this)">
+          <span class="cause-label">${i === 0 ? "caused by" : "root cause"}</span>
+          <span class="cause-class">${esc(shortName(c.exceptionClass))}</span>
+          ${c.exceptionMessage ? `<span class="cause-msg">— ${esc(c.exceptionMessage)}</span>` : ""}
+          ${appFrames ? `<span class="tag amber" style="margin-left:auto;margin-right:8px;">${appFrames} app</span>` : ""}
+          <span class="cause-chevron">▸</span>
+        </div>
+        <div class="cause-frames" id="${id}">
+          ${(c.frames || []).map((f) => frameRowHtml(f, f.appFrame ? "app" : "fw")).join("")}
+        </div>
+      </div>`;
+        })
+        .join("");
+    }
+
+    function toggleCause(id, hdr) {
+        const frames = document.getElementById(id);
+        const isOpen = frames.classList.contains('open');
+        if (isOpen) {
+            frames.classList.remove('open');
+            hdr.classList.remove('open');
+        } else {
+            frames.classList.add('open');
+            hdr.classList.add('open');
+        }
+    }
+
+    function renderCorrLogsHtml(logs, triggerLogId) {
+      return logs
+        .map((l) => {
+          const isTrigger = l.id === triggerLogId;
+          return `<div class="corr-log ${isTrigger ? "trigger" : ""}">
+      <span class="log-level ${l.level}">${l.level}</span>
+      <div class="log-body">
+        <div class="log-logger">${esc(shortName(l.loggerName))}</div>
+        <div class="log-message">${esc(l.message)}</div>
+      </div>
+    </div>`;
+        })
+        .join("");
+    }
+
+    // ── Log list ─────────────────────────────────────────────────────────────
+    function renderLogs(list) {
+      const el = document.getElementById("log-list");
+      if (!list.length) {
+        el.innerHTML = `<div class="empty"><div class="empty-icon">◌</div><div>No log entries</div></div>`;
+        return;
+      }
+
+      el.innerHTML = list
+        .map(
+          (l) => `
+    <div class="log-item">
+      <span class="log-level ${l.level}">${l.level}</span>
+      <div class="log-body">
+        <div class="log-logger">${esc(shortName(l.loggerName))}</div>
+        <div class="log-message">${esc(l.message)}</div>
+      </div>
+    </div>`,
+        )
+        .join("");
+    }
+
+    // ── Log filter ───────────────────────────────────────────────────────────
+    function setLogFilter(level, btn) {
+      logFilter = level;
+      document
+        .querySelectorAll(".filter-btn")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      poll();
+    }
+
+    // ── Clear ────────────────────────────────────────────────────────────────
+    async function clearAll() {
+      if (!confirm("Clear all captured errors and logs?")) return;
+      await fetch("/dev-scope/api/clear", { method: "DELETE" });
+      closeDetail();
+      poll();
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function shortName(fqn) {
+      if (!fqn) return "";
+      return fqn.includes(".")
+        ? fqn.substring(fqn.lastIndexOf(".") + 1)
+        : fqn;
+    }
+
+    function esc(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function relTime(ts) {
+      const diff = Math.floor((Date.now() - ts) / 1000);
+      if (diff < 5) return "just now";
+      if (diff < 60) return diff + "s ago";
+      if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+      return Math.floor(diff / 3600) + "h ago";
+    }
+
+    // ── Boot ─────────────────────────────────────────────────────────────────
+    poll();
+    setInterval(poll, 3000);
+</script>
+</body>
+</html>
