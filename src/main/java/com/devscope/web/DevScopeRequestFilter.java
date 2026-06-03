@@ -14,21 +14,17 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * Intercepts every HTTP request and captures exceptions in their full original
- * form — before Spring's error handling discards the wrapper chain.
+ * Captures exceptions thrown by the application before Spring's error
+ * handling discards the cause wrapper chain.
  *
  * WHY A FILTER AND NOT THE LOGBACK APPENDER:
- * When a controller throws a wrapped exception (e.g. OrderServiceException
- * wrapping IOException), Spring's DispatcherServlet logs the ROOT CAUSE as the
- * attached throwable — not the exception your code threw. The Logback appender
- * would therefore always capture the wrong exception as the primary entry.
+ * Spring's DispatcherServlet logs the ROOT CAUSE as the throwable on the
+ * log event — not the exception your code threw. A filter sits above that
+ * entire process, intercepts the raw exception first, and stores it with
+ * the full wrapper chain intact. It then rethrows so Spring handles the
+ * HTTP error response normally. DevScope never changes what the client sees.
  *
- * This filter sits above Spring's error handling. It catches the raw exception
- * first, walks the full cause chain, and stores the correct outermost exception.
- * It then rethrows so Spring can still produce the normal HTTP error response.
- *
- * Registered at order -1 via FilterRegistrationBean so it runs before Spring's
- * own filters and sees the unmodified exception.
+ * Registered at order -1 so it runs before Spring's own filters.
  */
 public class DevScopeRequestFilter extends OncePerRequestFilter {
     private final ErrorEventStore store;
@@ -40,13 +36,11 @@ public class DevScopeRequestFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Guards against double-capture using weak references to exception instances.
-     *
-     * The servlet container sometimes re-dispatches error requests through the
-     * filter chain (e.g. when forwarding to /error). WeakHashMap keys on object
-     * identity — the same exception object reference caught a second time returns
-     * false from add(), skipping the store write. Weak references ensure captured
-     * exceptions are garbage collected normally once the request is done.
+     * Tracks captured exception instances by reference using weak keys.
+     * The servlet container sometimes re-dispatches error requests through
+     * the filter chain, which would cause the same exception to be stored
+     * twice. WeakHashMap identity-keying prevents that without leaking memory
+     * — exceptions are garbage collected normally once the request is done.
      */
     private final Set<Throwable> capturedExceptions = Collections.synchronizedSet(
             Collections.newSetFromMap(new WeakHashMap<>())
@@ -61,19 +55,17 @@ public class DevScopeRequestFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (Exception e) {
             Throwable actual = unwrap(e);
-            if (capturedExceptions.add(actual)) {
+            if (!isInfrastructureException(actual) && capturedExceptions.add(actual)) {
                 store.addError(buildFromThrowable(actual, Thread.currentThread().getName()));
             }
-            throw e; // Always rethrow — DevScope never changes the HTTP response
+            throw e; // Always rethrow: DevScope never changes the HTTP response
         }
     }
 
     /**
-     * Strips known servlet and Spring wrapper types to get to the exception
-     * the application actually threw.
-     *
-     * Spring Boot 3 wraps controller exceptions in ServletException before they
-     * reach the filter chain. We unwrap until we find a non-wrapper type.
+     * Strips servlet and Spring wrapper types to reach the exception the
+     * application actually threw. Spring Boot 3 wraps controller exceptions
+     * in ServletException before they reach the filter chain.
      */
     private Throwable unwrap(Throwable t) {
         while (t != null) {
@@ -91,13 +83,29 @@ public class DevScopeRequestFilter extends OncePerRequestFilter {
         return t;
     }
 
+    /**
+     * Returns true for Spring infrastructure exceptions that are not
+     * application bugs — missing resources, unsupported methods, etc.
+     * These would be noise in the error feed and are excluded from capture.
+     */
+    private boolean isInfrastructureException(Throwable t) {
+        String name = t.getClass().getName();
+        return name.startsWith("org.springframework.web.servlet.resource.")
+                || name.equals("org.springframework.web.servlet.NoHandlerFoundException")
+                || name.equals("org.springframework.security.access.AccessDeniedException")
+                || name.equals("org.springframework.web.HttpRequestMethodNotSupportedException")
+                || name.equals("org.springframework.web.HttpMediaTypeNotSupportedException")
+                || name.equals("org.springframework.web.HttpMediaTypeNotAcceptableException")
+                || name.equals("org.springframework.web.bind.MissingServletRequestParameterException")
+                || name.equals("org.springframework.web.bind.MethodArgumentNotValidException");
+    }
+
     private ErrorEvent buildFromThrowable(Throwable t, String threadName) {
         List<StackFrame> frames         = parseFrames(t.getStackTrace());
         List<ErrorEvent.CausedBy> chain = parseCauseChain(t.getCause());
 
-        // The Logback appender has already stored the log lines that ran on
-        // this thread before the exception reached the filter. We fetch them
-        // here to attach as correlated context on the ErrorEvent.
+        // Log lines from this thread are already in the store — the Logback
+        // appender captured them before the exception reached this filter.
         List<LogEntry> correlatedLogs = store.getRecentLogsByThread(threadName, 20);
 
         return new ErrorEvent(
@@ -109,7 +117,7 @@ public class DevScopeRequestFilter extends OncePerRequestFilter {
                 frames,
                 chain,
                 correlatedLogs,
-                null // triggerLogId — not available at filter level
+                null // triggerLogId not available at filter level
         );
     }
 

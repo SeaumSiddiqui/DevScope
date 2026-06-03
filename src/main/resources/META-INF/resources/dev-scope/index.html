@@ -1240,8 +1240,30 @@
     }
 
     // ── Boot ─────────────────────────────────────────────────────────────────
-    poll();
-    setInterval(poll, 3000);
+    async function boot() {
+      try {
+          const health = await fetch('/dev-scope/health');
+          if (!health.ok) {
+              showDisabled();
+              return;
+          }
+          poll();
+          setInterval(poll, 3000);
+      } catch(e) {
+          console.warn('DevScope not reachable — polling stopped.');
+      }
+    }
+
+    function showDisabled() {
+      document.body.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:center;
+                      height:100vh;font-family:'IBM Plex Mono',monospace;
+                      color:#555;font-size:13px;background:#0a0a0a;">
+              DevScope is disabled. Set devscope.enabled=true to activate.
+          </div>`;
+    }
+
+  boot();
 </script>
 </body>
 </html>

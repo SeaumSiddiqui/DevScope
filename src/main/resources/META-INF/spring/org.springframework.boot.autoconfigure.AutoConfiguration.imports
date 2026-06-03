@@ -1,1 +1,2 @@
 com.devscope.autoconfigure.DevScopeAutoConfiguration
+com.devscope.autoconfigure.DevScopeUiAutoConfiguration

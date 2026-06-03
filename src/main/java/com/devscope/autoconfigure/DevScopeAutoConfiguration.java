@@ -13,23 +13,25 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
+
 /**
- * Spring Boot autoConfiguration entry point for DevScope.
+ * Core autoConfiguration — wires all DevScope beans when active.
  *
  * Discovered via META-INF/spring/org.springframework.boot.autoconfigure
- * .AutoConfiguration.imports — no @Import or @EnableDevScope annotation needed
- * in the consumer application.
+ * .AutoConfiguration.imports. No consumer-side annotation needed.
  *
- * Active only when both conditions pass:
- *   - @ConditionalOnWebApplication — skipped for batch jobs, CLI apps, etc.
- *   - @ConditionalOnProperty(devscope.enabled, matchIfMissing=true) — on by
- *     default; set devscope.enabled=false in a profile to disable.
+ * Active only when:
+ *   - The application has an embedded web server (@ConditionalOnWebApplication)
+ *   - devscope.enabled is true or absent (@ConditionalOnProperty matchIfMissing=true)
+ *
+ * The UI controller is intentionally NOT registered here. It lives in
+ * {@link DevScopeUiAutoConfiguration} so /dev-scope always resolves even
+ * when this configuration is skipped due to devscope.enabled=false.
  *
  * WHY NO @PostConstruct HERE:
- * Spring Boot 3 prohibits self-referential bean cycles. A @PostConstruct on
- * this class that called its own @Bean methods would trigger that check.
- * The Logback appender attachment is delegated to DevScopeAppenderLifecycle,
- * a plain bean that carries no @Configuration restrictions.
+ * Spring Boot 3 prohibits self-referential bean cycles. Logback attachment
+ * is delegated to {@link DevScopeAppenderLifecycle} — a plain bean with no
+ * @Configuration restrictions — which handles it via its own @PostConstruct.
  */
 @Configuration
 @ConditionalOnWebApplication
@@ -43,11 +45,8 @@ public class DevScopeAutoConfiguration {
     }
 
     /**
-     * The servlet filter that captures raw exceptions before Spring's error
-     * handling strips the cause wrapper.
-     *
-     * Order -1 places it before Spring's own filters so it sees the unmodified
-     * exception. Mapped to /* to cover all application routes.
+     * Intercepts raw exceptions before Spring's error handling strips the
+     * cause chain. Registered at order -1 to run before Spring's own filters.
      */
     @Bean
     public FilterRegistrationBean<DevScopeRequestFilter> devScopeRequestFilter(ErrorEventStore store) {
@@ -59,15 +58,16 @@ public class DevScopeAutoConfiguration {
     }
 
     /**
-     * The singleton ring buffer shared by the filter (writes errors), the
-     * appender (writes logs), and the controller (reads both).
+     * The singleton ring buffer shared across all DevScope components.
+     * The filter writes errors into it; the appender writes log lines;
+     * the controller reads both.
      */
     @Bean
     public ErrorEventStore errorEventStore() {
         return new ErrorEventStore(properties.getMaxErrors(), properties.getMaxLogs());
     }
 
-    /** REST API controller — registers /dev-scope/api/** endpoints. */
+    /** REST API — registers /dev-scope/api/** endpoints consumed by the UI. */
     @Bean
     public DevScopeController devScopeController(ErrorEventStore store, Environment environment) {
         return new DevScopeController(store, environment);
@@ -77,11 +77,5 @@ public class DevScopeAutoConfiguration {
     @Bean
     public DevScopeAppenderLifecycle devScopeAppenderLifecycle(ErrorEventStore store) {
         return new DevScopeAppenderLifecycle(store, properties.getBasePackage());
-    }
-
-    /** Serves the HTML UI at /dev-scope and /dev-scope/. */
-    @Bean
-    public DevScopeUiController devScopeUiController() {
-        return new DevScopeUiController();
     }
 }
