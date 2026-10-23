@@ -4,11 +4,6 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!--
-    PARENT: We inherit from Spring Boot's parent POM.
-    This gives us pre-matched dependency versions for everything Spring.
-    relativePath is empty because we're pulling it from Maven Central, not a local project.
-  -->
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -16,7 +11,6 @@
     <relativePath/>
   </parent>
 
-  <!-- IDENTITY: who this library is -->
   <groupId>com.devscope</groupId>
   <artifactId>spring-devscope</artifactId>
   <version>0.1.0-SNAPSHOT</version>
@@ -25,68 +19,44 @@
   <description>Developer error and log inspection UI for Spring Boot</description>
 
   <properties>
-    <java.version>21</java.version>
+    <!-- built with JDK 21, compiled for 17 so any Spring Boot 3 app can use it -->
+    <java.version>17</java.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
+  <!-- everything is optional: the consumer's Spring Boot app already brings these in -->
   <dependencies>
-
-    <!--
-      AUTOCONFIGURE: The core Spring Boot library that lets us write
-      auto-configuration classes. This is what makes our library plug in
-      automatically when added as a dependency — no @Import needed.
-      optional=true because the consumer's Spring Boot app already has this.
-    -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
       <optional>true</optional>
     </dependency>
 
-    <!--
-      WEB: Gives us @RestController, @GetMapping etc. for our UI endpoints.
-      optional=true because every Spring Boot web app already brings this in.
-    -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
       <optional>true</optional>
     </dependency>
 
-    <!--
-      LOGBACK: The logging library Spring Boot uses by default.
-      We need it to write our custom log appender (the hook that intercepts
-      every log line before it hits the terminal).
-      optional=true — already present in every Spring Boot app.
-    -->
+    <!-- needed for the custom appender -->
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <optional>true</optional>
     </dependency>
 
-    <!--
-      CONFIGURATION PROCESSOR: Generates metadata so that when a developer
-      types "devscope." in their application.properties, their IDE shows
-      autocomplete hints for our config properties.
-      optional=true — only needed at compile time, not at runtime.
-    -->
+    <!-- IDE autocomplete for devscope.* properties -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-configuration-processor</artifactId>
       <optional>true</optional>
     </dependency>
 
-    <!--
-      TEST: JUnit 5, Mockito, AssertJ etc. — only used when running tests.
-      scope=test means it never ends up in the final jar.
-    -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
 
 </project>

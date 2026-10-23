@@ -7,48 +7,29 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.LoggerFactory;
 
 /**
- * Attaches {@link DevScopeAppender} to Logback's root logger at startup.
+ * Attaches DevScopeAppender to Logback's root logger on startup.
  *
- * WHY THIS IS A SEPARATE CLASS:
- * Spring Boot 3 prohibits circular bean dependencies. A @PostConstruct on a
- * @Configuration class that references its own @Bean methods creates a
- * self-referential cycle Spring refuses to resolve. By moving the attachment
- * logic here — into a plain bean with no @Configuration concerns — Spring
- * constructs this object cleanly and calls @PostConstruct once it's ready.
- *
- * Lifecycle:
- *   1. Spring creates ErrorEventStore
- *   2. Spring creates this bean (store injected)
- *   3. Spring calls attach() via @PostConstruct
- *   4. All log events from every class in the app flow through DevScopeAppender
+ * This lives outside DevScopeAutoConfiguration on purpose. A @PostConstruct
+ * on a @Configuration class that uses its own @Bean methods is a
+ * self-referencing cycle, and Spring Boot 3 refuses to start with it.
  */
 public class DevScopeAppenderLifecycle {
     private final ErrorEventStore store;
-    private final String basePackage;
 
-    /**
-     * @param store the singleton store the appender writes into
-     * @param basePackage passed through to DevScopeAppender for consistency;
-     *                    frame parsing that uses this value lives in
-     *                    DevScopeRequestFilter
-     */
-    public DevScopeAppenderLifecycle(ErrorEventStore store, String basePackage) {
+    public DevScopeAppenderLifecycle(ErrorEventStore store) {
         this.store = store;
-        this.basePackage = basePackage;
     }
 
     @PostConstruct
     public void attach() {
-        DevScopeAppender appender = new DevScopeAppender(store, basePackage);
+        DevScopeAppender appender = new DevScopeAppender(store);
 
-        // SLF4J is an abstraction — getILoggerFactory() returns the concrete
-        // Logback LoggerContext at runtime, which we need to start the appender.
+        // SLF4J is just the facade, at runtime the factory is Logback's LoggerContext
         LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
         appender.setContext(context);
-        appender.start(); // mandatory — Logback silently drops events to unstarted appenders
+        appender.start(); // Logback silently drops events sent to an appender that isn't started
 
-        // Attaching to ROOT means every child logger in the app (every class
-        // using LoggerFactory.getLogger) routes through this appender automatically.
+        // every logger in the app is a child of ROOT, so this one line catches all of them
         Logger rootLogger = context.getLogger(Logger.ROOT_LOGGER_NAME);
         rootLogger.addAppender(appender);
 

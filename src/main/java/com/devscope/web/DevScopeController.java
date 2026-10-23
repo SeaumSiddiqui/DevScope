@@ -9,22 +9,16 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
- * REST API consumed by the DevScope UI.
+ * REST API the UI polls every 3 seconds. Everything sits under
+ * /dev-scope/api so it can't clash with the app's own routes.
  *
- * All endpoints live under /dev-scope/api to avoid clashing with the
- * application's own routes. The UI polls /errors, /logs, and /stats every 3
- * seconds via fetch(). All other endpoints are available for external tooling.
- *
- * Endpoints:
- *   GET /dev-scope/api/errors all -> captured errors, newest first
- *   GET /dev-scope/api/errors/{id} -> single error by ID
- *   GET /dev-scope/api/logs -> all captured logs, newest first
- *   GET /dev-scope/api/logs?level=X -> filtered by level (ERROR, WARN, INFO, DEBUG)
- *   GET /dev-scope/api/stats -> counts and active Spring profiles
- *   DELETE /dev-scope/api/clear -> wipe all stored data
+ *  GET    /dev-scope/api/errors          -> all errors, newest first
+ *  GET    /dev-scope/api/errors/{id}     -> one error
+ *  GET    /dev-scope/api/logs?level=X    -> logs, newest first, level optional
+ *  GET    /dev-scope/api/stats           -> counts + active profiles
+ *  DELETE /dev-scope/api/clear           -> wipe everything
  */
 @RequestMapping("/dev-scope/api")
 @RestController
@@ -42,14 +36,13 @@ public class DevScopeController {
         return store.getErrors();
     }
 
+    // 404 if the id is unknown or it was already dropped from the ring buffer
     @GetMapping("/errors/{id}")
     public ResponseEntity<ErrorEvent> getError(@PathVariable String id) {
-        Optional<ErrorEvent> found = store.getErrors()
+        return store.getErrors()
                 .stream()
                 .filter(e -> e.getId().equals(id))
-                .findFirst();
-
-        return found
+                .findFirst()
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -68,13 +61,8 @@ public class DevScopeController {
         );
     }
 
-    /**
-     * Returns counts and active Spring profiles for the UI header.
-     *
-     * Profiles are included here rather than as a separate endpoint so the UI
-     * can update all header values in one fetch. Falls back to ["default"] when
-     * no profiles are explicitly active — matching Spring Boot's own behaviour.
-     */
+    // profiles go here too so the UI header updates with one fetch.
+    // no active profile -> ["default"], same as Spring Boot itself
     @GetMapping("/stats")
     public Map<String, Object> getStats() {
         String[] profiles = environment.getActiveProfiles();

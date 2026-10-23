@@ -8,30 +8,21 @@ import com.devscope.store.ErrorEventStore;
 import java.util.UUID;
 
 /**
- * Custom Logback appender that captures every log line into the DevScope store.
+ * Logback appender that copies every log line into the store.
  *
- * Attached programmatically to Logback's root logger by
- * {@link DevScopeAppenderLifecycle} at startup — no logback.xml changes needed.
+ * Only handles log lines. Exceptions are captured by ErrorCapture, because
+ * by the time Spring logs an exception it has already swapped it for the
+ * root cause.
  *
- * SCOPE: this appender handles log lines only. Exception capture is handled
- * separately by {@link com.devscope.web.DevScopeRequestFilter}, which intercepts
- * the raw exception before Spring's error handling strips the wrapper chain.
- * Keeping these concerns separate means the appender stays fast — it does nothing
- * but build a plain object and write it to a concurrent collection.
- *
- * PERFORMANCE: append() runs synchronously on the application thread for every
- * log call in the entire application. Keep it fast — no I/O, no parsing, no
- * blocking operations.
+ * append() runs on the app thread for every single log call, so it has to
+ * stay cheap: build a POJO, write it to the store, done. No I/O.
  */
 public class DevScopeAppender extends AppenderBase<ILoggingEvent> {
     private final ErrorEventStore store;
 
-    // basePackage is accepted to keep the constructor signature consistent with
-    // DevScopeAppenderLifecycle, which holds it for potential future use.
-    // Frame parsing (which needs basePackage) lives in DevScopeRequestFilter.
-    public DevScopeAppender(ErrorEventStore store, String basePackage) {
+    public DevScopeAppender(ErrorEventStore store) {
         this.store = store;
-        setName("DEVSCOPE");
+        setName("DEVSCOPE"); // how Logback identifies this appender
     }
 
     @Override
@@ -43,10 +34,10 @@ public class DevScopeAppender extends AppenderBase<ILoggingEvent> {
         return new LogEntry(
                 UUID.randomUUID().toString(),
                 event.getTimeStamp(),
-                event.getLevel().toString(),
+                event.getLevel().toString(), // "ERROR", "WARN", "INFO", "DEBUG"
                 event.getLoggerName(),
-                event.getFormattedMessage(),
-                event.getThreadName()
+                event.getFormattedMessage(), // message with args substituted
+                event.getThreadName() // e.g. "http-nio-8080-exec-3"
         );
     }
 }
