@@ -15,7 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 
 /**
- * Wires everything up in a servlet web app unless devscope.enabled=false.
+ * Wires everything up when devscope.enabled=true in a servlet web app.
  * Picked up from META-INF/spring/...AutoConfiguration.imports, so the
  * consumer doesn't need any annotation.
  *
@@ -24,7 +24,7 @@ import org.springframework.core.env.Environment;
  */
 @AutoConfiguration
 @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
-@ConditionalOnProperty(name = "devscope.enabled", matchIfMissing = true)
+@ConditionalOnProperty(name = "devscope.enabled", havingValue = "true")
 @EnableConfigurationProperties(DevScopeProperties.class)
 public class DevScopeAutoConfiguration {
     private final DevScopeProperties properties;

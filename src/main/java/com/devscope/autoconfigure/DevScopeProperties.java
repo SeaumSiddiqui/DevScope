@@ -12,8 +12,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "devscope")
 public class DevScopeProperties {
-    /** Master switch, set false to disable without removing the dependency. */
-    private boolean enabled = true;
+    /**
+     * Off by default. DevScope exposes your logs over HTTP with no auth,
+     * so it should only ever be switched on for local/dev profiles.
+     */
+    private boolean enabled = false;
 
     /**
      * Root package of your own code. Stack frames starting with this are
