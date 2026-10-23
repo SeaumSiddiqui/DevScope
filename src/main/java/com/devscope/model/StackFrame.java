@@ -1,20 +1,8 @@
 package com.devscope.model;
 
 /**
- * One line in a stack trace.
- *
- * When an exception is thrown, Java records the full call chain — every method
- * that was executing at that moment. Each line in that chain is one StackFrame.
- *
- * Example: at com.example.OrderService.placeOrder(OrderService.java:81)
- *   className = "com.example.OrderService"
- *   methodName = "placeOrder"
- *   fileName = "OrderService.java"
- *   lineNumber = 81
- *   appFrame = true
- *
- * The appFrame flag is set by comparing className against devscope.base-package.
- * The UI uses it to highlight your code in amber and collapse framework frames.
+ * One line of a stack trace, e.g.
+ *   at com.example.OrderService.placeOrder(OrderService.java:81)
  */
 public class StackFrame {
     private String className;
@@ -22,10 +10,7 @@ public class StackFrame {
     private String fileName;
     private int lineNumber;
 
-    /**
-     * True if this frame belongs to the developer's own code,
-     * false for framework/JDK frames.
-     * */
+    // true when className starts with devscope.base-package (your code, not the framework)
     private boolean appFrame;
 
     public StackFrame() {}

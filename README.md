@@ -1,118 +1,92 @@
 # DevScope
 
-A zero-config Spring Boot library that gives you a live error inspection UI at `/dev-scope` — no infrastructure, no ELK stack, no setup beyond one dependency.
+[![build](https://github.com/SeaumSiddiqui/DevScope/actions/workflows/build.yml/badge.svg)](https://github.com/SeaumSiddiqui/DevScope/actions/workflows/build.yml)
+[![](https://jitpack.io/v/SeaumSiddiqui/DevScope.svg)](https://jitpack.io/#SeaumSiddiqui/DevScope)
 
-When something breaks, you open the browser instead of squinting at a terminal wall.
+A Spring Boot library that shows your app's errors in a web page at `/dev-scope`, with your own code highlighted and the logs that led to each error attached. One dependency, two properties, nothing else to set up.
 
 ![DevScope UI](assets/devscope_ui.png)
 
----
+## Why
 
-## The problem it solves
+One exception in Spring Boot prints 50+ lines in the terminal, most of it framework code. On top of that, the headline is often the wrong exception: Spring logs the root cause, not the exception your code actually threw. Finding your line and the log lines around it is manual work every time.
 
-Spring Boot's terminal output is honest but brutal. A single exception produces 50+ lines of stack trace, most of it framework internals that have nothing to do with your bug. Finding the one line in your own code, correlating it with the log lines that ran before it, and understanding the full cause chain — that's all manual work today.
+DevScope catches the exception before Spring touches it, keeps the full "Caused by" chain, and puts it in a UI where framework frames are collapsed and your frames stand out.
 
-DevScope captures every exception your app throws, parses it, and presents it in a structured UI with your code highlighted, framework noise collapsed, and the log context attached.
+## Install
 
----
-
-## Installation
-
-Add the dependency to your `pom.xml`:
+Add the JitPack repository and the dependency to your `pom.xml`:
 
 ```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
 <dependency>
-    <groupId>com.devscope</groupId>
-    <artifactId>spring-devscope</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <groupId>com.github.SeaumSiddiqui</groupId>
+    <artifactId>DevScope</artifactId>
+    <version>v0.1.0</version>
 </dependency>
 ```
 
-Add two lines to your `application.properties` or `application.yml`:
+Turn it on for your dev profile only, in `application-dev.properties`:
 
 ```properties
 devscope.enabled=true
 devscope.base-package=com.example.yourapp
 ```
 
-Start your application and open `http://localhost:8080/dev-scope`.
+Start the app and open `http://localhost:8080/dev-scope`.
 
-That's it. No `@EnableDevScope`, no XML, no beans to declare.
-
----
+DevScope is **off by default**. The UI and API have no authentication and show your logs, so keep it out of production.
 
 ## Configuration
 
-All properties are optional except `base-package`, which you should always set.
-
 | Property | Default | Description |
 |---|---|---|
-| `devscope.enabled` | `true` | Master switch. Set `false` to disable without removing the dependency. |
-| `devscope.base-package` | `""` | Root package of your own code — e.g. `com.example.myapp`. Used to distinguish your frames from framework frames in stack traces. |
-| `devscope.max-errors` | `200` | Maximum errors to keep in memory. Oldest is evicted when full. |
-| `devscope.max-logs` | `1000` | Maximum log lines to keep in memory. |
-
-For profile-specific activation (recommended), put the config in `application-dev.properties`:
-
-```properties
-# application-dev.properties
-devscope.enabled=true
-devscope.base-package=com.example.myapp
-```
-
-This way DevScope never accidentally runs in production.
-
----
+| `devscope.enabled` | `false` | Turns DevScope on. |
+| `devscope.base-package` | `""` | Root package of your code, e.g. `com.example.myapp`. Frames from this package are highlighted, everything else is collapsed. |
+| `devscope.max-errors` | `200` | Errors kept in memory. Oldest is dropped when full. |
+| `devscope.max-logs` | `1000` | Log lines kept in memory. |
 
 ## What you get
 
-**Error feed** — every exception your app throws appears in the left panel, newest first. Each entry shows the exception class, message, timestamp, thread, and the exact line in your code where it originated.
+- **Error feed**: every exception, newest first, with class, message, time, thread and the line in your code where it started.
+- **Handled exceptions too**: exceptions your `@ControllerAdvice` turns into a nice response are captured as well, and the response stays exactly the same.
+- **Stack trace viewer**: your frames highlighted, Spring/JDK frames collapsed behind a toggle.
+- **Cause chain**: each "Caused by" layer is its own collapsible block.
+- **Correlated logs**: the log lines from the same request thread right before the error.
+- **Live log stream**: all log lines with ERROR / WARN / INFO / DEBUG filters.
+- **Active profile** in the header.
 
-**Stack trace viewer** — clicking an error opens a detail drawer. Your code frames are highlighted in amber. The 50+ Spring and JDK frames are collapsed by default with a toggle to expand them when you need them.
+## API
 
-**Cause chain** — wrapped exceptions ("Caused by:") are rendered as nested collapsible layers so you can follow the chain from the outermost wrapper to the root cause without scrolling through a flat wall of text.
-
-**Correlated logs** — the log lines from the same thread in the seconds before the error are attached to each error entry. This is the context that explains what the app was doing when it broke.
-
-**Live log stream** — the right panel shows all captured log lines, newest first, with level filters (ERROR, WARN, INFO, DEBUG).
-
-**Active profile display** — the current Spring profile is shown in the header. Useful for diagnosing "works on my machine" issues where the culprit is usually a profile difference.
-
----
-
-## API endpoints
-
-The UI consumes these endpoints internally. They're also available directly if you want to integrate with other tools.
+The UI uses these, you can call them too:
 
 ```
-GET       /dev-scope/api/errors            >> all captured errors, newest first
-GET       /dev-scope/api/errors/{id}       >> single error by ID
-GET       /dev-scope/api/logs              >> all captured logs, newest first
-GET       /dev-scope/api/logs?level=ERROR  >> filtered by level
-GET       /dev-scope/api/stats             >> error count, log count, active profiles
-DELETE    /dev-scope/api/clear             >> wipe all stored data
+GET     /dev-scope/api/errors            all errors, newest first
+GET     /dev-scope/api/errors/{id}       one error
+GET     /dev-scope/api/logs?level=ERROR  logs, level is optional
+GET     /dev-scope/api/stats             counts + active profiles
+DELETE  /dev-scope/api/clear             wipe everything
 ```
-
----
 
 ## Safety
 
-DevScope is in-memory only. Nothing is written to disk, no external connections are made, no data leaves your process. Captured events are evicted automatically when the store reaches capacity.
-
-It activates only in web applications (`@ConditionalOnWebApplication`). Adding it to a batch job or CLI app has no effect.
-
-For production safety, always scope it to a dev profile as shown above, or set `devscope.enabled=false` in your production properties.
-
----
+- In-memory only. Nothing is written to disk and nothing leaves the process.
+- Fixed memory: both stores are ring buffers with a max size.
+- Never changes your app's behaviour: exceptions are always rethrown or passed on.
+- Only active in servlet web apps. In a batch job or CLI app it does nothing.
 
 ## Requirements
 
-- Java 17 or higher
+- Java 17+
 - Spring Boot 3.x
-- An embedded web server (Tomcat, Jetty, or Undertow)
-
----
+- An embedded servlet server (Tomcat, Jetty or Undertow)
 
 ## Contributing
 
-See [INTERNALS.md](INTERNALS.md) for architecture decisions, data flow, and a guide to the codebase.
+How it works under the hood is in [INTERNALS.md](INTERNALS.md). Run the tests with `mvn verify`.

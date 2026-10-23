@@ -8,28 +8,25 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 /**
- * Central in-memory store for all captured events.
+ * In-memory store for everything DevScope captures.
  *
- * Holds two fixed-size ring buffers — one for ErrorEvents, one for LogEntries.
- * When either buffer reaches capacity the oldest entry is evicted automatically,
- * keeping memory usage flat regardless of how long the application runs.
+ * Two fixed-size ring buffers, one for errors and one for log lines. When
+ * one is full the oldest entry is dropped, so memory stays flat no matter
+ * how long the app runs.
  *
- * Registered as a singleton Spring bean. DevScopeRequestFilter writes errors
- * into it; DevScopeAppender writes log lines; DevScopeController reads both.
- *
- * Thread safety: ReentrantReadWriteLock allows multiple concurrent readers but
- * serialises writes. All lock releases happen in finally blocks so an exception
- * during any write never leaves the lock held.
+ * Many request threads log at the same time, so access goes through a
+ * ReentrantReadWriteLock: reads can run together, writes are exclusive.
  */
 public class ErrorEventStore {
+    // same exception on the same thread within this window is treated as a duplicate
+    private static final long DUPLICATE_WINDOW_MS = 500;
+
     private final int maxErrors;
     private final int maxLogs;
 
-    // ArrayDeque gives O(1) add-to-tail and remove-from-head — the two
-    // operations a ring buffer needs most. Faster than LinkedList for this
-    // because it uses a resizable array with no per-node pointer overhead.
+    // ArrayDeque: O(1) add to tail and remove from head, which is all a ring buffer needs
     private final Deque<ErrorEvent> errorEvents;
-    private final Deque<LogEntry>   logEntries;
+    private final Deque<LogEntry> logEntries;
 
     private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -43,43 +40,33 @@ public class ErrorEventStore {
     // Write operations
 
     /**
-     * Stores a captured error event.
-     *
-     * Called by {@link com.devscope.web.DevScopeRequestFilter} each time it
-     * catches an exception thrown by the application.
-     *
-     * Duplicate guard: events with the same exception class, message, and thread
-     * arriving within 500ms are rejected. This prevents double-capture when the
-     * servlet container re-dispatches an error request through the filter chain.
+     * Rejects the event if the same exception class + message on the same
+     * thread was stored less than 500ms ago. The servlet container can send
+     * an error request through the filter chain a second time.
      */
     public void addError(ErrorEvent event) {
         lock.writeLock().lock();
+
         try {
-            boolean isDuplicate = !errorEvents.isEmpty() && errorEvents.stream()
-                    .anyMatch(existing ->
-                            existing.getThreadName().equals(event.getThreadName())
-                                    && existing.getExceptionClass().equals(event.getExceptionClass())
-                                    && Objects.equals(existing.getExceptionMessage(), event.getExceptionMessage())
-                                    && Math.abs(existing.getTimestamp() - event.getTimestamp()) < 500
-                    );
+            boolean isDuplicate = errorEvents.stream()
+                    .anyMatch(existing -> existing.getThreadName().equals(event.getThreadName())
+                            && existing.getExceptionClass().equals(event.getExceptionClass())
+                            && Objects.equals(existing.getExceptionMessage(), event.getExceptionMessage())
+                            && Math.abs(existing.getTimestamp() - event.getTimestamp()) < DUPLICATE_WINDOW_MS);
 
             if (isDuplicate) return;
 
-            if (errorEvents.size() >= maxErrors) errorEvents.pollFirst();
+            if (errorEvents.size() >= maxErrors) errorEvents.pollFirst(); // remove oldest
             errorEvents.addLast(event);
         } finally {
+            // always unlock in finally, otherwise one failed write blocks every write after it
             lock.writeLock().unlock();
         }
     }
 
-    /**
-     * Stores a captured log line.
-     *
-     * Called by {@link com.devscope.appender.DevScopeAppender} for every log
-     * event the application produces, across all levels.
-     */
     public void addLogs(LogEntry entry) {
         lock.writeLock().lock();
+
         try {
             if (logEntries.size() >= maxLogs) logEntries.pollFirst();
             logEntries.addLast(entry);
@@ -88,11 +75,12 @@ public class ErrorEventStore {
         }
     }
 
-    // Read Operations
+    // Read operations
 
-    /** Returns all stored errors, newest first. */
+    // stored oldest first, returned newest first so the UI shows the latest on top
     public List<ErrorEvent> getErrors() {
         lock.readLock().lock();
+
         try {
             List<ErrorEvent> list = new ArrayList<>(errorEvents);
             Collections.reverse(list);
@@ -103,13 +91,12 @@ public class ErrorEventStore {
     }
 
     /**
-     * Returns stored log lines, newest first.
-     *
-     * @param level optional level filter ("ERROR", "WARN", "INFO", "DEBUG").
-     *              Case-insensitive. Pass null to return all levels.
+     * Newest first. level is optional ("ERROR", "WARN", ...), case-insensitive,
+     * null or blank returns everything.
      */
     public List<LogEntry> getLogs(String level) {
         lock.readLock().lock();
+
         try {
             List<LogEntry> list = new ArrayList<>(logEntries);
             Collections.reverse(list);
@@ -126,36 +113,31 @@ public class ErrorEventStore {
     }
 
     /**
-     * Returns the most recent log lines from a specific thread, in chronological
-     * order (oldest to newest).
-     *
-     * Called by {@link com.devscope.web.DevScopeRequestFilter} when building an
-     * ErrorEvent — the returned lines become the error's correlated log context.
-     *
-     * @param threadName thread to filter by, e.g. "http-nio-8080-exec-3"
-     * @param limit maximum number of entries to return
+     * The last `limit` log lines from one thread, oldest to newest.
+     * Used to attach the lines that ran right before an exception.
      */
     public List<LogEntry> getRecentLogsByThread(String threadName, int limit) {
         lock.readLock().lock();
+
         try {
             List<LogEntry> list = new ArrayList<>(logEntries);
-            Collections.reverse(list); // newest first for efficient limiting
+            Collections.reverse(list); // newest first so limit() keeps the latest ones
 
-            return list.stream()
+            List<LogEntry> result = list.stream()
                     .filter(e -> threadName.equals(e.getThreadName()))
                     .limit(limit)
-                    .collect(Collectors.collectingAndThen(Collectors.toList(), result -> {
-                        Collections.reverse(result); // back to chronological for display
-                        return result;
-                    }));
+                    .collect(Collectors.toList());
+
+            Collections.reverse(result); // back to timeline order
+            return result;
         } finally {
             lock.readLock().unlock();
         }
     }
 
-    /** Wipes all stored errors and log lines. */
     public void clear() {
         lock.writeLock().lock();
+
         try {
             errorEvents.clear();
             logEntries.clear();
@@ -166,13 +148,21 @@ public class ErrorEventStore {
 
     public int getErrorCount() {
         lock.readLock().lock();
-        try { return errorEvents.size(); }
-        finally { lock.readLock().unlock(); }
+
+        try {
+            return errorEvents.size();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     public int getLogCount() {
         lock.readLock().lock();
-        try { return logEntries.size(); }
-        finally { lock.readLock().unlock(); }
+
+        try {
+            return logEntries.size();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }

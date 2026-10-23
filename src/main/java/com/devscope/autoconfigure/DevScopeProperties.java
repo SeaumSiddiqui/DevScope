@@ -2,14 +2,8 @@ package com.devscope.autoconfigure;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-
 /**
- * Configuration properties for DevScope, bound from application.properties.
- *
- * All properties are optional except base-package, which should always be set
- * to the root package of your own code (e.g. com.example.myapp).
- *
- * Example configuration:
+ * Bound from application.properties, e.g.
  *
  *   devscope.enabled=true
  *   devscope.base-package=com.example.myapp
@@ -19,25 +13,22 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "devscope")
 public class DevScopeProperties {
     /**
-     * Master on/off switch. Defaults to true.
-     * Set false to disable without removing the dependency.
-     * */
-    private boolean enabled = true;
+     * Off by default. DevScope exposes your logs over HTTP with no auth,
+     * so it should only ever be switched on for local/dev profiles.
+     */
+    private boolean enabled = false;
 
     /**
-     * Root package of the developer's own code.
-     *
-     * Any stack frame whose class name starts with this value is marked as an
-     * app frame — highlighted in the UI and counted separately from framework
-     * frames. Too broad a value (e.g. "com") flags framework classes as yours;
-     * too narrow misses service and repository layers.
+     * Root package of your own code. Stack frames starting with this are
+     * marked as app frames and highlighted in the UI, everything else is
+     * treated as framework noise.
      */
     private String basePackage = "";
 
-    /** Maximum ErrorEvents to hold in memory. Oldest is evicted when this limit is hit. */
+    /** Max errors kept in memory, oldest is dropped when full. */
     private int maxErrors = 200;
 
-    /** Maximum LogEntry objects to hold in memory. Oldest is evicted when this limit is hit. */
+    /** Max log lines kept in memory, oldest is dropped when full. */
     private int maxLogs = 1000;
 
     public boolean isEnabled() {

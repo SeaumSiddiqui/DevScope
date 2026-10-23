@@ -3,25 +3,8 @@ package com.devscope.model;
 import java.util.List;
 
 /**
- * One captured exception — the central object of this library.
- *
- * Created by {@link com.devscope.web.DevScopeRequestFilter} when it intercepts
- * a raw exception thrown by the application, before Spring's error handling
- * strips the wrapper chain.
- *
- * Contains the exception itself, its full cause chain, and the log lines from
- * the same thread that ran in the seconds before it fired.
- *
- * WHY CAUSE CHAIN:
- * Java exceptions are often wrapped — a ServiceException wrapping a
- * RepositoryException wrapping a SQLException. We store the whole chain so the
- * UI can render it as nested collapsible layers rather than a flat wall of text.
- *
- * WHY CORRELATED LOGS:
- * The log lines from the same thread before the error are the story of what the
- * app was doing. A developer reading "NullPointerException in placeOrder" needs
- * to know which order request triggered it, which user, which product. That
- * context is in the preceding log lines, and we attach it automatically.
+ * One captured exception, with its full cause chain and the log lines from
+ * the same thread that ran right before it.
  */
 public class ErrorEvent {
     private String id;
@@ -32,23 +15,13 @@ public class ErrorEvent {
     private String exceptionMessage;
     private List<StackFrame> frames;
 
-    /**
-     * The "Caused by:" chain. Index 0 is the direct cause of the top-level
-     * exception; the last index is the root cause.
-     */
+    // "Caused by:" layers, index 0 is the direct cause, last one is the root cause
     private List<CausedBy> causeChain;
 
-    /**
-     * Log lines from the same thread captured before this exception fired,
-     * ordered oldest to newest.
-     */
+    // log lines from the same thread before the error, oldest to newest
     private List<LogEntry> correlatedLogs;
 
-    /**
-     * ID of the LogEntry that accompanied this exception in the log output.
-     * The UI uses this to highlight that specific line in the correlated logs list.
-     * Null if the error was captured by the filter without a matching log event.
-     */
+    // id of the log line that came with the exception, the UI highlights it. can be null
     private String triggerLogId;
 
     public ErrorEvent() {}
@@ -138,10 +111,7 @@ public class ErrorEvent {
     }
 
 
-    /**
-     * One "Caused by:" layer in the exception chain.
-     * Nested here because it has no meaning outside an ErrorEvent.
-     */
+    // one "Caused by:" layer, only makes sense inside an ErrorEvent
     public static class CausedBy {
         private String exceptionClass;
         private String exceptionMessage;

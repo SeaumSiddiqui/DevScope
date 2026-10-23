@@ -1,23 +1,19 @@
 package com.devscope.autoconfigure;
 
 import com.devscope.web.DevScopeUiController;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
- * Registers {@link DevScopeUiController} unconditionally for all web apps.
- *
- * Separate from {@link DevScopeAutoConfiguration} by design. The core config
- * is gated behind devscope.enabled — but the UI controller must always be
- * present so /dev-scope never goes unmapped. An unmapped /dev-scope would
- * throw NoResourceFoundException, which consumer GlobalExceptionHandlers
- * log as an ERROR. A library must never produce side effects in its host
- * application. This split is what prevents that.
+ * Always registers the UI controller, even when DevScope is disabled.
+ * Otherwise /dev-scope is unmapped, Spring throws NoResourceFoundException
+ * and the consumer's GlobalExceptionHandler logs it as an ERROR. A library
+ * shouldn't leave noise like that in someone else's logs.
  */
-@Configuration
-@ConditionalOnWebApplication
+@AutoConfiguration
+@ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
 public class DevScopeUiAutoConfiguration {
     @Bean
     public DevScopeUiController devScopeUiController(ApplicationContext context) {
