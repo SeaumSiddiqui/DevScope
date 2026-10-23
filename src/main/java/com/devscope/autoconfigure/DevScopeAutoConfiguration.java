@@ -3,7 +3,9 @@ package com.devscope.autoconfigure;
 import com.devscope.appender.DevScopeAppenderLifecycle;
 import com.devscope.store.ErrorEventStore;
 import com.devscope.web.DevScopeController;
+import com.devscope.web.DevScopeExceptionResolver;
 import com.devscope.web.DevScopeRequestFilter;
+import com.devscope.web.ErrorCapture;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -36,14 +38,26 @@ public class DevScopeAutoConfiguration {
         return new ErrorEventStore(properties.getMaxErrors(), properties.getMaxLogs());
     }
 
-    // catches exceptions before Spring strips the cause chain, order -1 so we sit before Spring's own filters
     @Bean
-    public FilterRegistrationBean<DevScopeRequestFilter> devScopeRequestFilter(ErrorEventStore store) {
+    public ErrorCapture errorCapture(ErrorEventStore store) {
+        return new ErrorCapture(store, properties.getBasePackage());
+    }
+
+    // catches exceptions nobody handled, order -1 so we sit before Spring's own filters
+    @Bean
+    public FilterRegistrationBean<DevScopeRequestFilter> devScopeRequestFilter(ErrorCapture capture) {
         FilterRegistrationBean<DevScopeRequestFilter> registration =
-                new FilterRegistrationBean<>(new DevScopeRequestFilter(store, properties.getBasePackage()));
+                new FilterRegistrationBean<>(new DevScopeRequestFilter(capture));
         registration.setOrder(-1);
         registration.addUrlPatterns("/*");
         return registration;
+    }
+
+    // catches exceptions that an @ExceptionHandler / @ControllerAdvice handles,
+    // those never reach the filter
+    @Bean
+    public DevScopeExceptionResolver devScopeExceptionResolver(ErrorCapture capture) {
+        return new DevScopeExceptionResolver(capture);
     }
 
     @Bean
